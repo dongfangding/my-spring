@@ -1,6 +1,21 @@
 # my-spring
-简单实现spring核心功能
+简单实现spring核心功能， 不过写的肯定非常粗糙， 只是自己的练习理解。尤其是`BeanFactory`接口下的一堆体系，实在是太复杂太爆炸了。
 
+## 测试
+入口在`com.ddf.framework.customize.spring.beans.demo.ApplicationRunner`， 与测试相关的都放在这个包下了
+
+测试时，启动容器方法如下：
+```java
+public static void main(String[] args) {
+    final AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(
+            "com.ddf.framework.customize.spring.beans.demo");
+    final TaskService taskService = context.getBean(TaskService.class);
+    taskService.doTask("ddf", "我要开始装逼了");
+
+    final JdbcProperties jdbcProperties = context.getBean(JdbcProperties.class);
+    System.out.println("获取到的bean的结果: " + jdbcProperties);
+}
+```
 
 ## 实现功能列表
 
