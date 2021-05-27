@@ -22,4 +22,13 @@ public interface BeanDefinition {
      * @return
      */
     Class<?> getBeanClass();
+
+
+    /**
+     * 获取一个已经实例的类，不需要自己再实例化
+     *
+     * @return
+     */
+    Object getInstance();
+
 }

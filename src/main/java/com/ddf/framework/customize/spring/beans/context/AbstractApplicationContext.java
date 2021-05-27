@@ -6,12 +6,17 @@ import cn.hutool.core.util.StrUtil;
 import com.ddf.framework.customize.spring.beans.annotation.Autowired;
 import com.ddf.framework.customize.spring.beans.annotation.Component;
 import com.ddf.framework.customize.spring.beans.annotation.Service;
+import com.ddf.framework.customize.spring.beans.annotation.Transactional;
 import com.ddf.framework.customize.spring.beans.annotation.Value;
 import com.ddf.framework.customize.spring.beans.exception.BeansException;
 import com.ddf.framework.customize.spring.beans.exception.NoSuchBeanDefinitionException;
 import com.ddf.framework.customize.spring.beans.exception.NoUniqueBeanDefinitionException;
+import com.ddf.framework.customize.spring.jdbc.factory.TransactionProxyFactory;
+import com.ddf.framework.customize.spring.jdbc.transactional.PlatformTransactionManage;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +54,8 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
      * class type to class instance array
      */
     private final Map<Class<?>, List<String>> singletonBeanNamesByType = new ConcurrentHashMap(64);
+
+    private TransactionProxyFactory transactionProxyFactory;
 
     /**
      * 刷新容器
@@ -133,6 +140,16 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
     }
 
     /**
+     * 注册bean
+     *
+     * @param bean
+     */
+    public void registerBean(Object bean) {
+        final String name = bean.getClass().getSimpleName();
+        new GenericBeanDefinition(name.substring(0, 1).toLowerCase() + name.substring(1), bean);
+    }
+
+    /**
      * 根据class来获取Bean对象
      *
      * @param requiredType Bean的class类型
@@ -160,38 +177,48 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
             return;
         }
         for (BeanDefinition definition : beanDefinitionSet) {
-            final Class<?> currClazz = definition.getBeanClass();
-            final String name = definition.getBeanName();
-            try {
-                // 存储BeanDefinition Map
-                registerBeanDefinition(definition.getBeanName(), definition);
-
-                final Object obj = currClazz.newInstance();
-                // bean name 映射实例
-                this.singletonObjects.put(name, obj);
-
-                Class<?> clazzMapKey;
-                // bean clazz 映射实例, 如果有接口，使用接口class做映射
-                if (currClazz.getInterfaces().length > 0) {
-                    clazzMapKey = currClazz.getInterfaces()[0];
-                } else {
-                    clazzMapKey = currClazz;
-                }
-
-                // 一个class接口对应多个bean name
-                List<String> currClazzBeanNames = singletonBeanNamesByType.get(clazzMapKey);
-                if (CollectionUtil.isEmpty(currClazzBeanNames)) {
-                    currClazzBeanNames = new ArrayList<>();
-                }
-                currClazzBeanNames.add(name);
-                singletonBeanNamesByType.put(clazzMapKey, currClazzBeanNames);
-            } catch (InstantiationException | IllegalAccessException e) {
-                e.printStackTrace();
-            }
+            addSingleBean(definition);
         }
 
         // 填充bean 属性
         populateBeanProperties();
+    }
+
+
+    /**
+     * 添加单例bean
+     *
+     * @param definition
+     */
+    private void addSingleBean(BeanDefinition definition) {
+        final Class<?> currClazz = definition.getBeanClass();
+        final String name = definition.getBeanName();
+        try {
+            // 存储BeanDefinition Map
+            registerBeanDefinition(definition.getBeanName(), definition);
+
+            final Object obj = currClazz.newInstance();
+            // bean name 映射实例
+            this.singletonObjects.put(name, obj);
+
+            Class<?> clazzMapKey;
+            // bean clazz 映射实例, 如果有接口，使用接口class做映射
+            if (currClazz.getInterfaces().length > 0) {
+                clazzMapKey = currClazz.getInterfaces()[0];
+            } else {
+                clazzMapKey = currClazz;
+            }
+
+            // 一个class接口对应多个bean name
+            List<String> currClazzBeanNames = singletonBeanNamesByType.get(clazzMapKey);
+            if (CollectionUtil.isEmpty(currClazzBeanNames)) {
+                currClazzBeanNames = new ArrayList<>();
+            }
+            currClazzBeanNames.add(name);
+            singletonBeanNamesByType.put(clazzMapKey, currClazzBeanNames);
+        } catch (InstantiationException | IllegalAccessException e) {
+            e.printStackTrace();
+        }
     }
 
     /**
@@ -269,6 +296,18 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
         }
         // 这里需要处理fieldValue与实际字段类型的转换
         ReflectUtil.setFieldValue(instance, field.getName(), fieldValue);
+    }
+
+    private void proxyTransaction(Class<?> currClazz) {
+        if (Objects.nonNull(transactionProxyFactory)) {
+            transactionProxyFactory = new TransactionProxyFactory(getBean(PlatformTransactionManage.class));
+        }
+        final Method[] methods = currClazz.getMethods();
+        final boolean hasTransaction = Arrays.stream(methods)
+                .anyMatch(val -> val.isAnnotationPresent(Transactional.class));
+        if (hasTransaction) {
+
+        }
     }
 
     /**
