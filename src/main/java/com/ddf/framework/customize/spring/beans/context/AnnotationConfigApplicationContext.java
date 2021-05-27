@@ -39,6 +39,10 @@ public class AnnotationConfigApplicationContext extends AbstractApplicationConte
         refresh();
     }
 
+
+    /**
+     * 扫描包，组装BeanDefinition对象
+     */
     protected void scan() {
         // 从配置类中解析要扫描的包
         if (configurationClass != null) {
@@ -56,8 +60,7 @@ public class AnnotationConfigApplicationContext extends AbstractApplicationConte
         for (String aPackage : basePackageScan) {
             final Set<Class<?>> classes = ClassUtil.scanPackage(aPackage);
             matchedClazzSet.addAll(classes.stream()
-                    .filter(clazz ->
-                            clazz.isAnnotationPresent(Service.class) || clazz.isAnnotationPresent(Component.class))
+                    .filter(this::hasIocAnnotation)
                     .collect(Collectors.toList()));
         }
         String value = null;

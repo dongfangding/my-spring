@@ -13,7 +13,7 @@ import java.lang.annotation.Target;
  * @version 1.0
  * @date 2021/05/27 16:26
  */
-@Target({ElementType.TYPE})
+@Target({ElementType.FIELD})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface Value {

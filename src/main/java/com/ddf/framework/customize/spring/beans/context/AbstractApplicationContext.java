@@ -2,7 +2,11 @@ package com.ddf.framework.customize.spring.beans.context;
 
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.util.ReflectUtil;
+import cn.hutool.core.util.StrUtil;
 import com.ddf.framework.customize.spring.beans.annotation.Autowired;
+import com.ddf.framework.customize.spring.beans.annotation.Component;
+import com.ddf.framework.customize.spring.beans.annotation.Service;
+import com.ddf.framework.customize.spring.beans.annotation.Value;
 import com.ddf.framework.customize.spring.beans.exception.BeansException;
 import com.ddf.framework.customize.spring.beans.exception.NoSuchBeanDefinitionException;
 import com.ddf.framework.customize.spring.beans.exception.NoUniqueBeanDefinitionException;
@@ -203,30 +207,77 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
             final Class<?> currClazz = instance.getClass();
             final Field[] fields = ReflectUtil.getFields(currClazz);
             for (Field field : fields) {
-                if (!field.isAnnotationPresent(Autowired.class)) {
+                if (!field.isAnnotationPresent(Autowired.class) && !field.isAnnotationPresent(Value.class)) {
                     continue;
                 }
-                final Autowired autowiredAnnotation = field.getAnnotation(Autowired.class);
-                Object dependencyBean;
-                // 一个Class对应多个bean name
-                if (singletonBeanNamesByType.get(field.getType()).size() > 1) {
-                    // 从单例池中取， 字段名即为bean name
-                    dependencyBean = this.singletonObjects.get(field.getName());
-                    if (Objects.isNull(dependencyBean) && autowiredAnnotation.required()) {
-                        throw new NoUniqueBeanDefinitionException(field.getType(), singletonBeanNamesByType.get(field.getType()));
-                    }
-                } else {
-                    // 一个class 只对应一个bean name, 从class映射bean缓存中取
-                    dependencyBean = this.singletonObjects.get(this.singletonBeanNamesByType.get(field.getType()).get(0));
-                    if (Objects.isNull(dependencyBean) && autowiredAnnotation.required()) {
-                        throw new NoSuchBeanDefinitionException(field.getType());
-                    }
-                }
-                ReflectUtil.setFieldValue(instance, field, dependencyBean);
-//                String methodName = "set" + field.getName().substring(0, 1).toUpperCase() + field.getName().substring(1);
-//                final Method method = ReflectUtil.getMethod(currClazz, methodName, field.getType());
-//                ReflectUtil.invoke(instance, method, dependencyBean);
+                // 填充bean的依赖注入
+                populateBeanDependency(instance, field);
+                // 处理bean的{@link Value} 注解属性注入
+                populateBeanFieldValue(instance, field);
             }
         });
+    }
+
+
+    /**
+     * 处理bean的依赖注入
+     *
+     * @param instance
+     * @param field
+     */
+    private void populateBeanDependency(Object instance, Field field) {
+        final Autowired autowiredAnnotation = field.getAnnotation(Autowired.class);
+        if (Objects.isNull(autowiredAnnotation)) {
+            return;
+        }
+        Object dependencyBean;
+        // 一个Class对应多个bean name
+        if (singletonBeanNamesByType.get(field.getType()).size() > 1) {
+            // 从单例池中取， 字段名即为bean name
+            dependencyBean = this.singletonObjects.get(field.getName());
+            if (Objects.isNull(dependencyBean) && autowiredAnnotation.required()) {
+                throw new NoUniqueBeanDefinitionException(field.getType(), singletonBeanNamesByType.get(field.getType()));
+            }
+        } else {
+            // 一个class 只对应一个bean name, 从class映射bean缓存中取
+            dependencyBean = this.singletonObjects.get(this.singletonBeanNamesByType.get(field.getType()).get(0));
+            if (Objects.isNull(dependencyBean) && autowiredAnnotation.required()) {
+                throw new NoSuchBeanDefinitionException(field.getType());
+            }
+        }
+        ReflectUtil.setFieldValue(instance, field, dependencyBean);
+        //                String methodName = "set" + field.getName().substring(0, 1).toUpperCase() + field.getName().substring(1);
+        //                final Method method = ReflectUtil.getMethod(currClazz, methodName, field.getType());
+        //                ReflectUtil.invoke(instance, method, dependencyBean);
+    }
+
+
+    /**
+     * 处理bean的{@link Value} 注解属性注入
+     *
+     * @param instance
+     * @param field
+     */
+    private void populateBeanFieldValue(Object instance, Field field) {
+        final Value valueAnnotation = field.getAnnotation(Value.class);
+        if (Objects.isNull(valueAnnotation)) {
+            return;
+        }
+        final String fieldValue = valueAnnotation.value();
+        if (StrUtil.isBlank(fieldValue)) {
+            return;
+        }
+        // 这里需要处理fieldValue与实际字段类型的转换
+        ReflectUtil.setFieldValue(instance, field.getName(), fieldValue);
+    }
+
+    /**
+     * 判断一个类是否有IOC标记的注解,统一收口
+     *
+     * @param clazz
+     * @return
+     */
+    public boolean hasIocAnnotation(Class<?> clazz) {
+        return clazz.isAnnotationPresent(Component.class) || clazz.isAnnotationPresent(Service.class);
     }
 }
