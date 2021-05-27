@@ -2,10 +2,12 @@ package com.ddf.framework.customize.spring.beans.context;
 
 import cn.hutool.core.util.ClassUtil;
 import cn.hutool.core.util.StrUtil;
+import com.ddf.framework.customize.spring.beans.annotation.Component;
 import com.ddf.framework.customize.spring.beans.annotation.ComponentScan;
 import com.ddf.framework.customize.spring.beans.annotation.Service;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.Data;
 
 /**
@@ -52,11 +54,19 @@ public class AnnotationConfigApplicationContext extends AbstractApplicationConte
         Set<Class<?>> matchedClazzSet = new HashSet<>(128);
         // 在指定包中扫描添加了IOC标记的类
         for (String aPackage : basePackageScan) {
-            matchedClazzSet.addAll(ClassUtil.scanPackageByAnnotation(aPackage, Service.class));
+            final Set<Class<?>> classes = ClassUtil.scanPackage(aPackage);
+            matchedClazzSet.addAll(classes.stream()
+                    .filter(clazz ->
+                            clazz.isAnnotationPresent(Service.class) || clazz.isAnnotationPresent(Component.class))
+                    .collect(Collectors.toList()));
         }
+        String value = null;
         for (Class<?> aClass : matchedClazzSet) {
-            final Service serviceAnnotation = aClass.getAnnotation(Service.class);
-            String value = serviceAnnotation.value();
+            if (aClass.isAnnotationPresent(Service.class)) {
+                value = aClass.getAnnotation(Service.class).value();
+            } else if (aClass.isAnnotationPresent(Component.class)) {
+                value = aClass.getAnnotation(Component.class).value();
+            }
             if (StrUtil.isBlank(value)) {
                 value = aClass.getSimpleName().substring(0, 1).toLowerCase() + aClass.getSimpleName().substring(1);
             }

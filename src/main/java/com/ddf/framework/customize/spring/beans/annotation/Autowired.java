@@ -9,6 +9,8 @@ import java.lang.annotation.Target;
 
 /**
  * <p>自动装配注解</p >
+ * 模式按照class注入，如果发现有多个class，则使用字段名作为bean name注入， 都处理不了抛出异常
+ *
  * TODO
  * 1. 暂时只支持字段注入
  *

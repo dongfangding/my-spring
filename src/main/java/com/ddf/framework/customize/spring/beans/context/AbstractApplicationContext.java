@@ -206,18 +206,19 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
                 if (!field.isAnnotationPresent(Autowired.class)) {
                     continue;
                 }
+                final Autowired autowiredAnnotation = field.getAnnotation(Autowired.class);
                 Object dependencyBean;
                 // 一个Class对应多个bean name
                 if (singletonBeanNamesByType.get(field.getType()).size() > 1) {
                     // 从单例池中取， 字段名即为bean name
                     dependencyBean = this.singletonObjects.get(field.getName());
-                    if (Objects.isNull(dependencyBean)) {
+                    if (Objects.isNull(dependencyBean) && autowiredAnnotation.required()) {
                         throw new NoUniqueBeanDefinitionException(field.getType(), singletonBeanNamesByType.get(field.getType()));
                     }
                 } else {
                     // 一个class 只对应一个bean name, 从class映射bean缓存中取
                     dependencyBean = this.singletonObjects.get(this.singletonBeanNamesByType.get(field.getType()).get(0));
-                    if (Objects.isNull(dependencyBean)) {
+                    if (Objects.isNull(dependencyBean) && autowiredAnnotation.required()) {
                         throw new NoSuchBeanDefinitionException(field.getType());
                     }
                 }

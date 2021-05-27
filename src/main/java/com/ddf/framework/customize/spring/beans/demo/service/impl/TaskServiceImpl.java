@@ -21,7 +21,7 @@ public class TaskServiceImpl implements TaskService {
     @Autowired
     private ReportService reportServiceImpl;
     @Autowired
-    private ReportService complexReportServiceImpl;
+    private ReportService reportService;
 
     /**
      * 任务描述
@@ -33,7 +33,7 @@ public class TaskServiceImpl implements TaskService {
     public String doTask(String name, String taskDescription) {
         helloService.hello(name);
         reportServiceImpl.report(name);
-        complexReportServiceImpl.report(name);
+        reportService.report(name);
         System.out.println("去吧，皮卡丘：" + taskDescription);
         return null;
     }
