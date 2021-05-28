@@ -5,6 +5,7 @@ import cn.hutool.core.util.ReflectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ddf.framework.customize.spring.beans.annotation.Autowired;
 import com.ddf.framework.customize.spring.beans.annotation.Component;
+import com.ddf.framework.customize.spring.beans.annotation.Configuration;
 import com.ddf.framework.customize.spring.beans.annotation.Service;
 import com.ddf.framework.customize.spring.beans.annotation.Transactional;
 import com.ddf.framework.customize.spring.beans.annotation.Value;
@@ -137,16 +138,6 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
     @SuppressWarnings("unchecked")
     public <T> T getBean(String beanName, Class<T> requiredType) throws BeansException {
         return (T) getBean(beanName);
-    }
-
-    /**
-     * 注册bean
-     *
-     * @param bean
-     */
-    public void registerBean(Object bean) {
-        final String name = bean.getClass().getSimpleName();
-        new GenericBeanDefinition(name.substring(0, 1).toLowerCase() + name.substring(1), bean);
     }
 
     /**
@@ -317,6 +308,7 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
      * @return
      */
     public boolean hasIocAnnotation(Class<?> clazz) {
-        return clazz.isAnnotationPresent(Component.class) || clazz.isAnnotationPresent(Service.class);
+        return clazz.isAnnotationPresent(Component.class) || clazz.isAnnotationPresent(Service.class) || clazz.isAnnotationPresent(
+                Configuration.class);
     }
 }

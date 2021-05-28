@@ -1,10 +1,15 @@
 package com.ddf.framework.customize.spring.beans.context;
 
 import cn.hutool.core.util.ClassUtil;
+import cn.hutool.core.util.ReflectUtil;
 import cn.hutool.core.util.StrUtil;
+import com.ddf.framework.customize.spring.beans.annotation.Bean;
 import com.ddf.framework.customize.spring.beans.annotation.Component;
 import com.ddf.framework.customize.spring.beans.annotation.ComponentScan;
+import com.ddf.framework.customize.spring.beans.annotation.Configuration;
 import com.ddf.framework.customize.spring.beans.annotation.Service;
+import com.ddf.framework.customize.spring.support.util.ContextUtil;
+import java.lang.reflect.Method;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -64,16 +69,45 @@ public class AnnotationConfigApplicationContext extends AbstractApplicationConte
                     .collect(Collectors.toList()));
         }
         String value = null;
-        for (Class<?> aClass : matchedClazzSet) {
-            if (aClass.isAnnotationPresent(Service.class)) {
-                value = aClass.getAnnotation(Service.class).value();
-            } else if (aClass.isAnnotationPresent(Component.class)) {
-                value = aClass.getAnnotation(Component.class).value();
+        for (Class<?> clazz : matchedClazzSet) {
+            // 如果类为配置类，则额外处理
+            parseConfigurationClass(clazz);
+
+            // 当前类为容器类
+            if (clazz.isAnnotationPresent(Service.class)) {
+                value = clazz.getAnnotation(Service.class).value();
+            } else if (clazz.isAnnotationPresent(Component.class)) {
+                value = clazz.getAnnotation(Component.class).value();
             }
             if (StrUtil.isBlank(value)) {
-                value = aClass.getSimpleName().substring(0, 1).toLowerCase() + aClass.getSimpleName().substring(1);
+                value = ContextUtil.getBeanNameByClass(clazz);
             }
-            super.addBeanDefinition(new GenericBeanDefinition(value, aClass));
+            super.addBeanDefinition(new GenericBeanDefinition(value, clazz));
+        }
+    }
+
+
+    /**
+     * 解析配置类
+     *
+     * @param clazz
+     */
+    private void parseConfigurationClass(Class<?> clazz) {
+        if (!clazz.isAnnotationPresent(Configuration.class)) {
+            return;
+        }
+        final Method[] methods = ReflectUtil.getMethods(clazz);
+        for (Method method : methods) {
+            if (!method.isAnnotationPresent(Bean.class)) {
+                continue;
+            }
+
+            final Bean beanAnnotation = method.getAnnotation(Bean.class);
+            String beanName = beanAnnotation.value();
+            if (StrUtil.isBlank(beanName)) {
+                beanName = ContextUtil.getBeanNameByMethod(method);
+            }
+            super.addBeanDefinition(new GenericBeanDefinition(beanName, clazz));
         }
     }
 }
