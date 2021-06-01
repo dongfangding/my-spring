@@ -1,5 +1,8 @@
 package com.ddf.framework.customize.spring.jdbc.transactional;
 
+import com.ddf.framework.customize.spring.jdbc.factory.SimpleDataSource;
+import java.sql.Connection;
+import javax.sql.DataSource;
 import lombok.SneakyThrows;
 
 /**
@@ -13,8 +16,18 @@ public class DataSourceTransactionManage implements PlatformTransactionManage {
 
     private final DataSourceHolder dataSourceHolder;
 
-    public DataSourceTransactionManage(DataSourceHolder dataSourceHolder) {
-        this.dataSourceHolder = dataSourceHolder;
+    public DataSourceTransactionManage(DataSource dataSource) {
+        this.dataSourceHolder = new SimpleDataSource(dataSource);
+    }
+
+    /**
+     * 获取连接
+     *
+     * @return
+     */
+    @Override
+    public Connection getConnection() {
+        return dataSourceHolder.getThreadLocalConnection();
     }
 
     /**

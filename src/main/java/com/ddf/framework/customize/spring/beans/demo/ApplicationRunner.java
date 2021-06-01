@@ -5,9 +5,6 @@ import com.ddf.framework.customize.spring.beans.context.AnnotationConfigApplicat
 import com.ddf.framework.customize.spring.beans.demo.model.JdbcProperties;
 import com.ddf.framework.customize.spring.beans.demo.model.TestA;
 import com.ddf.framework.customize.spring.beans.demo.service.TaskService;
-import com.ddf.framework.customize.spring.jdbc.factory.SimpleDataSource;
-import com.ddf.framework.customize.spring.jdbc.properties.ConnectionProperties;
-import com.ddf.framework.customize.spring.jdbc.transactional.DataSourceTransactionManage;
 import com.ddf.framework.customize.spring.jdbc.transactional.PlatformTransactionManage;
 
 /**
@@ -34,20 +31,13 @@ public class ApplicationRunner {
         testA.delegate();
 
         // 测试事务
-        final ConnectionProperties connectionProperties = new ConnectionProperties();
-        connectionProperties.setUrl("jdbc:mysql://localhost:3306/zdy_mybatis?useUnicode=true&amp;characterEncoding=UTF8&amp;useSSL=false&amp;serverTimezone=GMT%2B8&amp;zeroDateTimeBehavior=convertToNull&amp;allowMultiQueries=true&amp;autoReconnect=true&amp;failOverReadOnly=false&amp;maxReconnects=10&amp;tinyInt1isBit=false")
-                .setDriverClassName("com.mysql.cj.jdbc.Driver")
-                .setUsername("root")
-                .setPassword("123456");
-        final DruidDataSource druidDataSource = new DruidDataSource();
-        druidDataSource.setUrl("jdbc:mysql://localhost:3306/zdy_mybatis?useUnicode=true&amp;characterEncoding=UTF8&amp;useSSL=false&amp;serverTimezone=GMT%2B8&amp;zeroDateTimeBehavior=convertToNull&amp;allowMultiQueries=true&amp;autoReconnect=true&amp;failOverReadOnly=false&amp;maxReconnects=10&amp;tinyInt1isBit=false");
-        druidDataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
-        druidDataSource.setUsername("root");
-        druidDataSource.setPassword("123456");
+        // 获取数据源
+        final DruidDataSource dataSource = context.getBean(DruidDataSource.class);
+        // 获取事务管理器
+        final PlatformTransactionManage platformTransactionManage = context.getBean(PlatformTransactionManage.class);
+        System.out.println("获取连接1: " + platformTransactionManage.getConnection());
+        System.out.println("获取连接2: " + platformTransactionManage.getConnection());
+        System.out.println("获取连接3: " + platformTransactionManage.getConnection());
 
-        // 准备数据源
-        final SimpleDataSource source = new SimpleDataSource(druidDataSource);
-        // 数据源交给事务管理器
-        PlatformTransactionManage platformTransactionManage = new DataSourceTransactionManage(source);
     }
 }

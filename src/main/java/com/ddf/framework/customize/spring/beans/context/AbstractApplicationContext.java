@@ -157,7 +157,7 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
     public <T> T getBean(Class<T> requiredType) throws BeansException {
         final List<String> beanNames = singletonBeanNamesByType.get(requiredType);
         if (CollectionUtil.isEmpty(beanNames)) {
-            throw new NoUniqueBeanDefinitionException(requiredType, beanNames);
+            throw new NoSuchBeanDefinitionException(requiredType);
         }
         return (T) this.singletonObjects.get(beanNames.get(0));
     }
@@ -254,7 +254,8 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
 
         Class<?> clazzMapKey;
         // bean clazz 映射实例, 如果有接口，使用接口class做映射
-        if (currClazz.getInterfaces().length > 0) {
+        // FIXME 多个接口如何确定是哪个接口呢？
+        if (currClazz.getInterfaces().length == 1) {
             clazzMapKey = currClazz.getInterfaces()[0];
         } else {
             clazzMapKey = currClazz;

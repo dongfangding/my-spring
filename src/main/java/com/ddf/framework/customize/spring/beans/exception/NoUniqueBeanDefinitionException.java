@@ -12,6 +12,6 @@ import java.util.List;
 public class NoUniqueBeanDefinitionException extends NoSuchBeanDefinitionException {
 
     public NoUniqueBeanDefinitionException(Class<?> type, List<String> beanNamesFound) {
-        super("找到[" + type.getName() +"]的bean的数量不唯一， " + beanNamesFound.toString());
+        super("找到[" + type.getName() +"]的bean的数量不唯一， " + (beanNamesFound == null ? "0" : beanNamesFound.toString()));
     }
 }
