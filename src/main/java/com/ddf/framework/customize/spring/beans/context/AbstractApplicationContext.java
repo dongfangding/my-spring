@@ -12,8 +12,11 @@ import com.ddf.framework.customize.spring.beans.annotation.Value;
 import com.ddf.framework.customize.spring.beans.exception.BeansException;
 import com.ddf.framework.customize.spring.beans.exception.NoSuchBeanDefinitionException;
 import com.ddf.framework.customize.spring.beans.exception.NoUniqueBeanDefinitionException;
+import com.ddf.framework.customize.spring.beans.type.MethodMetadata;
+import com.ddf.framework.customize.spring.beans.type.StandardMethodMetadata;
 import com.ddf.framework.customize.spring.jdbc.factory.TransactionProxyFactory;
 import com.ddf.framework.customize.spring.jdbc.transactional.PlatformTransactionManage;
+import com.ddf.framework.customize.spring.support.util.ContextUtil;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -24,6 +27,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -181,35 +185,89 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
      *
      * @param definition
      */
+    @SneakyThrows
     private void addSingleBean(BeanDefinition definition) {
         final Class<?> currClazz = definition.getBeanClass();
         final String name = definition.getBeanName();
-        try {
-            // 存储BeanDefinition Map
-            registerBeanDefinition(definition.getBeanName(), definition);
-
+        // 存储BeanDefinition Map
+        registerBeanDefinition(definition.getBeanName(), definition);
+        if (definition instanceof GenericBeanDefinition) {
+            // 暂时先简单解决， 如果一个bean依赖于另外一个bean， 那么就会提前创建这个bean, 然后这个bean自己的创建流程发现已经创建了就跳过
+            if (this.singletonObjects.containsKey(name)) {
+                return;
+            }
             final Object obj = currClazz.newInstance();
-            // bean name 映射实例
-            this.singletonObjects.put(name, obj);
-
-            Class<?> clazzMapKey;
-            // bean clazz 映射实例, 如果有接口，使用接口class做映射
-            if (currClazz.getInterfaces().length > 0) {
-                clazzMapKey = currClazz.getInterfaces()[0];
-            } else {
-                clazzMapKey = currClazz;
+            doCreateBean(currClazz, name, obj);
+        } else if (definition instanceof AnnotationBeanDefinition) {
+            // 创建用户基于注解注入自定义实例化方法的bean
+            AnnotationBeanDefinition annotationBeanDefinition = (AnnotationBeanDefinition) definition;
+            final MethodMetadata metadata = annotationBeanDefinition.getMethodMetadata();
+            if (metadata instanceof StandardMethodMetadata) {
+                StandardMethodMetadata standardMethodMetadata = (StandardMethodMetadata) metadata;
+                final Method factoryMethod = standardMethodMetadata.getMethod();
+                final Class<?>[] types = factoryMethod.getParameterTypes();
+                if (types.length == 0) {
+                    final Object methodBean = singletonBeanNamesByType.get(factoryMethod.getReturnType());
+                    if (Objects.nonNull(methodBean)) {
+                        return;
+                    }
+                    doCreateBean(factoryMethod.getReturnType(), ContextUtil.getBeanMethodName(factoryMethod),
+                            factoryMethod.getReturnType().newInstance()
+                    );
+                    return;
+                }
+                Object[] parameterObj = new Object[types.length];
+                // 解析当前方法的入参， 每个入参都从ioc容器中取出， 如果这个时候还没创建，则执行创建bean流程
+                for (int i = 0; i < types.length; i++) {
+                    Class<?> type = types[i];
+                    Object paramObj;
+                    try {
+                        paramObj = getBean(type);
+                    } catch (BeansException beansException) {
+                        paramObj = null;
+                    }
+                    if (Objects.nonNull(paramObj)) {
+                        parameterObj[i] = paramObj;
+                    } else {
+                        final Object obj = type.newInstance();
+                        parameterObj[i] = doCreateBean(type, ContextUtil.getBeanNameByClass(type), obj);
+                    }
+                }
+                final Object methodBean = factoryMethod.invoke(factoryMethod.getDeclaringClass()
+                        .newInstance(), parameterObj);
+                doCreateBean(factoryMethod.getReturnType(), ContextUtil.getBeanMethodName(factoryMethod), methodBean);
             }
-
-            // 一个class接口对应多个bean name
-            List<String> currClazzBeanNames = singletonBeanNamesByType.get(clazzMapKey);
-            if (CollectionUtil.isEmpty(currClazzBeanNames)) {
-                currClazzBeanNames = new ArrayList<>();
-            }
-            currClazzBeanNames.add(name);
-            singletonBeanNamesByType.put(clazzMapKey, currClazzBeanNames);
-        } catch (InstantiationException | IllegalAccessException e) {
-            e.printStackTrace();
         }
+    }
+
+    /**
+     * 创建bean
+     *
+     * @param currClazz
+     * @param name
+     * @return
+     */
+    @SneakyThrows
+    private Object doCreateBean(Class<?> currClazz, String name, Object obj) {
+        // bean name 映射实例
+        this.singletonObjects.put(name, obj);
+
+        Class<?> clazzMapKey;
+        // bean clazz 映射实例, 如果有接口，使用接口class做映射
+        if (currClazz.getInterfaces().length > 0) {
+            clazzMapKey = currClazz.getInterfaces()[0];
+        } else {
+            clazzMapKey = currClazz;
+        }
+
+        // 一个class接口对应多个bean name
+        List<String> currClazzBeanNames = singletonBeanNamesByType.get(clazzMapKey);
+        if (CollectionUtil.isEmpty(currClazzBeanNames)) {
+            currClazzBeanNames = new ArrayList<>();
+        }
+        currClazzBeanNames.add(name);
+        singletonBeanNamesByType.put(clazzMapKey, currClazzBeanNames);
+        return obj;
     }
 
     /**
@@ -249,6 +307,9 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
             return;
         }
         Object dependencyBean;
+        if (!singletonBeanNamesByType.containsKey(field.getType())) {
+            throw new NoSuchBeanDefinitionException(field.getType());
+        }
         // 一个Class对应多个bean name
         if (singletonBeanNamesByType.get(field.getType()).size() > 1) {
             // 从单例池中取， 字段名即为bean name

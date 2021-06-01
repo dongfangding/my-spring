@@ -8,12 +8,14 @@ import com.ddf.framework.customize.spring.beans.annotation.Component;
 import com.ddf.framework.customize.spring.beans.annotation.ComponentScan;
 import com.ddf.framework.customize.spring.beans.annotation.Configuration;
 import com.ddf.framework.customize.spring.beans.annotation.Service;
+import com.ddf.framework.customize.spring.beans.type.StandardMethodMetadata;
 import com.ddf.framework.customize.spring.support.util.ContextUtil;
 import java.lang.reflect.Method;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.Data;
+import lombok.SneakyThrows;
 
 /**
  * <p>description</p >
@@ -54,7 +56,9 @@ public class AnnotationConfigApplicationContext extends AbstractApplicationConte
             if (configurationClass.isAnnotationPresent(ComponentScan.class)) {
                 final ComponentScan annotation = configurationClass.getAnnotation(ComponentScan.class);
                 final String[] basePackagesValue = annotation.basePackages();
-                if (basePackagesValue.length == 0) {
+                if (basePackagesValue.length != 0) {
+                    this.basePackages = basePackagesValue;
+                } else {
                     this.basePackages = new String[] {configurationClass.getPackage().getName()};
                 }
             }
@@ -78,6 +82,8 @@ public class AnnotationConfigApplicationContext extends AbstractApplicationConte
                 value = clazz.getAnnotation(Service.class).value();
             } else if (clazz.isAnnotationPresent(Component.class)) {
                 value = clazz.getAnnotation(Component.class).value();
+            } else if (clazz.isAnnotationPresent(Configuration.class)) {
+                value = ContextUtil.getBeanNameByClass(clazz);
             }
             if (StrUtil.isBlank(value)) {
                 value = ContextUtil.getBeanNameByClass(clazz);
@@ -92,6 +98,7 @@ public class AnnotationConfigApplicationContext extends AbstractApplicationConte
      *
      * @param clazz
      */
+    @SneakyThrows
     private void parseConfigurationClass(Class<?> clazz) {
         if (!clazz.isAnnotationPresent(Configuration.class)) {
             return;
@@ -107,7 +114,7 @@ public class AnnotationConfigApplicationContext extends AbstractApplicationConte
             if (StrUtil.isBlank(beanName)) {
                 beanName = ContextUtil.getBeanNameByMethod(method);
             }
-            super.addBeanDefinition(new GenericBeanDefinition(beanName, clazz));
+            super.addBeanDefinition(new AnnotationGenericBeanDefinition(beanName, new StandardMethodMetadata(method)));
         }
     }
 }

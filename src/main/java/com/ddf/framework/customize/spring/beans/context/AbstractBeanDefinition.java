@@ -22,16 +22,6 @@ public abstract class AbstractBeanDefinition implements BeanDefinition {
         this.beanClass = beanClass;
     }
 
-    /**
-     * 获取一个已经实例的类，不需要自己再实例化
-     *
-     * @return
-     */
-    @Override
-    public Object getInstance() {
-        return null;
-    }
-
     @Override
     public boolean equals(Object o) {
         if (this == o) {

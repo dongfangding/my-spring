@@ -3,6 +3,7 @@ package com.ddf.framework.customize.spring.beans.demo;
 import com.alibaba.druid.pool.DruidDataSource;
 import com.ddf.framework.customize.spring.beans.context.AnnotationConfigApplicationContext;
 import com.ddf.framework.customize.spring.beans.demo.model.JdbcProperties;
+import com.ddf.framework.customize.spring.beans.demo.model.TestA;
 import com.ddf.framework.customize.spring.beans.demo.service.TaskService;
 import com.ddf.framework.customize.spring.jdbc.factory.SimpleDataSource;
 import com.ddf.framework.customize.spring.jdbc.properties.ConnectionProperties;
@@ -19,8 +20,7 @@ import com.ddf.framework.customize.spring.jdbc.transactional.PlatformTransaction
 public class ApplicationRunner {
 
     public static void main(String[] args) {
-        final AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(
-                "com.ddf.framework.customize.spring.beans.demo");
+        final AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(CustomizeDemoConfig.class);
 
         // 测试IOC
         final TaskService taskService = context.getBean(TaskService.class);
@@ -29,6 +29,9 @@ public class ApplicationRunner {
         final JdbcProperties jdbcProperties = context.getBean(JdbcProperties.class);
         System.out.println("获取到的bean的结果: " + jdbcProperties);
 
+        // 测试通过@Bean和配置类注入有依赖和无依赖的bean
+        TestA testA = context.getBean(TestA.class);
+        testA.delegate();
 
         // 测试事务
         final ConnectionProperties connectionProperties = new ConnectionProperties();

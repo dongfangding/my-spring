@@ -14,7 +14,7 @@ import lombok.SneakyThrows;
  * @version 1.0
  * @date 2021/05/27 18:14
  */
-public abstract class DataSourceHolder implements DataSourceFactory {
+public class DataSourceHolder implements DataSourceFactory {
 
     private final DataSource dataSource;
 
