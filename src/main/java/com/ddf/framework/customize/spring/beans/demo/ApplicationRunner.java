@@ -5,6 +5,8 @@ import com.ddf.framework.customize.spring.beans.context.AnnotationConfigApplicat
 import com.ddf.framework.customize.spring.beans.demo.model.JdbcProperties;
 import com.ddf.framework.customize.spring.beans.demo.model.TestA;
 import com.ddf.framework.customize.spring.beans.demo.service.TaskService;
+import com.ddf.framework.customize.spring.beans.demo.service.TransactionalService;
+import com.ddf.framework.customize.spring.jdbc.factory.TransactionProxyFactory;
 import com.ddf.framework.customize.spring.jdbc.transactional.PlatformTransactionManage;
 
 /**
@@ -16,7 +18,7 @@ import com.ddf.framework.customize.spring.jdbc.transactional.PlatformTransaction
  */
 public class ApplicationRunner {
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         final AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(CustomizeDemoConfig.class);
 
         // 测试IOC
@@ -35,9 +37,21 @@ public class ApplicationRunner {
         final DruidDataSource dataSource = context.getBean(DruidDataSource.class);
         // 获取事务管理器
         final PlatformTransactionManage platformTransactionManage = context.getBean(PlatformTransactionManage.class);
-        System.out.println("获取连接1: " + platformTransactionManage.getConnection());
-        System.out.println("获取连接2: " + platformTransactionManage.getConnection());
-        System.out.println("获取连接3: " + platformTransactionManage.getConnection());
+        System.out.println(Thread.currentThread().getName() + "获取连接1: " + platformTransactionManage.getConnection());
+        System.out.println(Thread.currentThread().getName() + "获取连接2: " + platformTransactionManage.getConnection());
+        System.out.println(Thread.currentThread().getName() + "获取连接3: " + platformTransactionManage.getConnection());
 
+
+        // TODO 事务的代理框架层面是如何处理的？什么时候生成代理？是为每个有事务的方法单独存储代理还是公用一个代理？
+        final TransactionProxyFactory factory = new TransactionProxyFactory(platformTransactionManage);
+
+        final TransactionalService transactionalService = context.getBean(TransactionalService.class);
+        final TransactionalService proxyTransactionalService = (TransactionalService) factory.getTransactionProxy(transactionalService);
+        System.out.println(transactionalService);
+        proxyTransactionalService.insert("ddf1", "value1");
+        new Thread(() -> {
+            proxyTransactionalService.insert("ss", "bb");
+        }).start();
+        Thread.sleep(10000);
     }
 }

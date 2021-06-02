@@ -19,6 +19,7 @@ import com.ddf.framework.customize.spring.jdbc.transactional.PlatformTransaction
 import com.ddf.framework.customize.spring.support.util.ContextUtil;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -51,6 +52,11 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
     private final Map<String, BeanDefinition> beanDefinitionMap = new ConcurrentHashMap<>(128);
 
     /**
+     * bean name  to   BeanDefinition
+     */
+    private final Map<Class<?>, List<BeanDefinition>> beanDefinitionClassMap = new ConcurrentHashMap<>(128);
+
+    /**
      * bean name to class instance
      */
     private final Map<String, Object> singletonObjects = new ConcurrentHashMap<>(128);
@@ -78,6 +84,17 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
      */
     public void addBeanDefinition(BeanDefinition beanDefinition) {
         beanDefinitionSet.add(beanDefinition);
+        // 存储BeanDefinition Map, 用以处理bean依赖时，判断依赖的对象有没有定义
+        registerBeanDefinition(beanDefinition.getBeanName(), beanDefinition);
+        // 存储class对应BeanDefinition列表， 用以处理bean依赖时，如果依赖的bean是使用@Bean的有参依赖构造时，通过class查找bean，
+        // 查询多个用形参名作为bean name, 一个的话直接使用
+        final Class<?> classBeanMapKey = ContextUtil.getBeanInterfaceClass(beanDefinition.getBeanClass());
+        List<BeanDefinition> definitions = this.beanDefinitionClassMap.get(classBeanMapKey);
+        if (Objects.isNull(definitions)) {
+            definitions = new ArrayList<>();
+        }
+        definitions.add(beanDefinition);
+        this.beanDefinitionClassMap.put(classBeanMapKey, definitions);
     }
 
     /**
@@ -174,9 +191,6 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
         for (BeanDefinition definition : beanDefinitionSet) {
             addSingleBean(definition);
         }
-
-        // 填充bean 属性
-        populateBeanProperties();
     }
 
 
@@ -186,18 +200,17 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
      * @param definition
      */
     @SneakyThrows
-    private void addSingleBean(BeanDefinition definition) {
+    private Object addSingleBean(BeanDefinition definition) {
         final Class<?> currClazz = definition.getBeanClass();
-        final String name = definition.getBeanName();
-        // 存储BeanDefinition Map
-        registerBeanDefinition(definition.getBeanName(), definition);
+        final String beanName = definition.getBeanName();
+        Object instance = null;
+        // 暂时先简单解决， 如果一个bean依赖于另外一个bean， 那么就会提前创建这个bean, 然后这个bean自己的创建流程发现已经创建了就跳过
+        if (this.singletonObjects.containsKey(definition.getBeanName())) {
+            return this.singletonObjects.get(definition.getBeanName());
+        }
         if (definition instanceof GenericBeanDefinition) {
-            // 暂时先简单解决， 如果一个bean依赖于另外一个bean， 那么就会提前创建这个bean, 然后这个bean自己的创建流程发现已经创建了就跳过
-            if (this.singletonObjects.containsKey(name)) {
-                return;
-            }
-            final Object obj = currClazz.newInstance();
-            doCreateBean(currClazz, name, obj);
+            instance = currClazz.newInstance();
+            doCreateBean(currClazz, beanName, instance);
         } else if (definition instanceof AnnotationBeanDefinition) {
             // 创建用户基于注解注入自定义实例化方法的bean
             AnnotationBeanDefinition annotationBeanDefinition = (AnnotationBeanDefinition) definition;
@@ -206,18 +219,17 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
                 StandardMethodMetadata standardMethodMetadata = (StandardMethodMetadata) metadata;
                 final Method factoryMethod = standardMethodMetadata.getMethod();
                 final Class<?>[] types = factoryMethod.getParameterTypes();
+                final Parameter[] parameters = factoryMethod.getParameters();
                 if (types.length == 0) {
                     final Object methodBean = singletonBeanNamesByType.get(factoryMethod.getReturnType());
                     if (Objects.nonNull(methodBean)) {
-                        return;
+                        return methodBean;
                     }
-                    doCreateBean(factoryMethod.getReturnType(), ContextUtil.getBeanMethodName(factoryMethod),
-                            factoryMethod.getReturnType().newInstance()
-                    );
-                    return;
+                    return doCreateBean(factoryMethod.getReturnType(), ContextUtil.getBeanNameByMethod(factoryMethod), factoryMethod.getReturnType().newInstance());
                 }
                 Object[] parameterObj = new Object[types.length];
                 // 解析当前方法的入参， 每个入参都从ioc容器中取出， 如果这个时候还没创建，则执行创建bean流程
+                // fixme 如果依赖的容器是一个@Bean修饰的，那么执行创建的时候就得要找到那个方法去执行才可以，否则调用无参构造会有问题
                 for (int i = 0; i < types.length; i++) {
                     Class<?> type = types[i];
                     Object paramObj;
@@ -229,14 +241,42 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
                     if (Objects.nonNull(paramObj)) {
                         parameterObj[i] = paramObj;
                     } else {
-                        final Object obj = type.newInstance();
-                        parameterObj[i] = doCreateBean(type, ContextUtil.getBeanNameByClass(type), obj);
+//                        final Object obj = addSingleBean(
+//                                getBeanDefinitionByClassOrName(type, parameters[i].getName(), true));
+//                        parameterObj[i] = doCreateBean(type, ContextUtil.getBeanNameByClass(type), obj);
+                        parameterObj[i] = addSingleBean(
+                                getBeanDefinitionByClassOrName(type, parameters[i].getName(), true));
                     }
                 }
-                final Object methodBean = factoryMethod.invoke(factoryMethod.getDeclaringClass()
+                instance = factoryMethod.invoke(factoryMethod.getDeclaringClass()
                         .newInstance(), parameterObj);
-                doCreateBean(factoryMethod.getReturnType(), ContextUtil.getBeanMethodName(factoryMethod), methodBean);
+                doCreateBean(factoryMethod.getReturnType(), ContextUtil.getBeanMethodName(factoryMethod), instance);
             }
+        } else {
+            throw new RuntimeException("不支持的bean定义");
+        }
+
+        // 填充bean 属性
+        if (Objects.nonNull(instance)) {
+            populateBeanProperties(beanName, instance);
+        }
+        return instance;
+    }
+
+    /**
+     * 填充Bean的属性
+     */
+    private void populateBeanProperties(String beanName, Object bean) {
+        final Class<?> currClazz = bean.getClass();
+        final Field[] fields = ReflectUtil.getFields(currClazz);
+        for (Field field : fields) {
+            if (!field.isAnnotationPresent(Autowired.class) && !field.isAnnotationPresent(Value.class)) {
+                continue;
+            }
+            // 填充bean的依赖注入
+            populateBeanDependency(beanName, bean, field);
+            // 处理bean的{@link Value} 注解属性注入
+            populateBeanFieldValue(bean, field);
         }
     }
 
@@ -252,14 +292,7 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
         // bean name 映射实例
         this.singletonObjects.put(name, obj);
 
-        Class<?> clazzMapKey;
-        // bean clazz 映射实例, 如果有接口，使用接口class做映射
-        // FIXME 多个接口如何确定是哪个接口呢？
-        if (currClazz.getInterfaces().length == 1) {
-            clazzMapKey = currClazz.getInterfaces()[0];
-        } else {
-            clazzMapKey = currClazz;
-        }
+        Class<?> clazzMapKey = ContextUtil.getBeanInterfaceClass(currClazz);
 
         // 一个class接口对应多个bean name
         List<String> currClazzBeanNames = singletonBeanNamesByType.get(clazzMapKey);
@@ -288,7 +321,7 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
                     continue;
                 }
                 // 填充bean的依赖注入
-                populateBeanDependency(instance, field);
+                populateBeanDependency(name, instance, field);
                 // 处理bean的{@link Value} 注解属性注入
                 populateBeanFieldValue(instance, field);
             }
@@ -302,25 +335,36 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
      * @param instance
      * @param field
      */
-    private void populateBeanDependency(Object instance, Field field) {
+    private void populateBeanDependency(String beanName, Object instance, Field field) {
         final Autowired autowiredAnnotation = field.getAnnotation(Autowired.class);
         if (Objects.isNull(autowiredAnnotation)) {
             return;
         }
         Object dependencyBean;
-        if (!singletonBeanNamesByType.containsKey(field.getType())) {
-            throw new NoSuchBeanDefinitionException(field.getType());
+        if (!beanDefinitionClassMap.containsKey(field.getType())) {
+            if (!this.beanDefinitionMap.containsKey(beanName)) {
+                throw new NoSuchBeanDefinitionException(field.getType());
+            }
+            addSingleBean(this.beanDefinitionMap.get(beanName));
         }
         // 一个Class对应多个bean name
-        if (singletonBeanNamesByType.get(field.getType()).size() > 1) {
+        if (beanDefinitionClassMap.get(field.getType()).size() > 1) {
             // 从单例池中取， 字段名即为bean name
             dependencyBean = this.singletonObjects.get(field.getName());
+            if (Objects.isNull(dependencyBean)) {
+                dependencyBean = addSingleBean(this.beanDefinitionMap.get(field.getName()));
+            }
             if (Objects.isNull(dependencyBean) && autowiredAnnotation.required()) {
                 throw new NoUniqueBeanDefinitionException(field.getType(), singletonBeanNamesByType.get(field.getType()));
             }
         } else {
             // 一个class 只对应一个bean name, 从class映射bean缓存中取
-            dependencyBean = this.singletonObjects.get(this.singletonBeanNamesByType.get(field.getType()).get(0));
+            final List<String> dependencyBeanNameList = this.singletonBeanNamesByType.get(field.getType());
+            if (CollectionUtil.isEmpty(dependencyBeanNameList)) {
+                dependencyBean = addSingleBean(this.beanDefinitionClassMap.get(field.getType()).get(0));
+            } else {
+                dependencyBean = this.singletonObjects.get(this.singletonBeanNamesByType.get(field.getType()).get(0));
+            }
             if (Objects.isNull(dependencyBean) && autowiredAnnotation.required()) {
                 throw new NoSuchBeanDefinitionException(field.getType());
             }
@@ -372,5 +416,24 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
     public boolean hasIocAnnotation(Class<?> clazz) {
         return clazz.isAnnotationPresent(Component.class) || clazz.isAnnotationPresent(Service.class) || clazz.isAnnotationPresent(
                 Configuration.class);
+    }
+
+
+    public BeanDefinition getBeanDefinitionByClassOrName(Class<?> clazz, String beanName, boolean isRequired) {
+        final List<BeanDefinition> definitions = this.beanDefinitionClassMap.get(clazz);
+        if (CollectionUtil.isEmpty(definitions)) {
+            if (isRequired) {
+                throw new NoSuchBeanDefinitionException(clazz);
+            }
+            return null;
+        }
+        if (definitions.size() == 1) {
+            return definitions.get(0);
+        }
+        final BeanDefinition definition = this.beanDefinitionMap.get(beanName);
+        if (Objects.isNull(definition) && isRequired) {
+            throw new NoSuchBeanDefinitionException(clazz);
+        }
+        return definition;
     }
 }

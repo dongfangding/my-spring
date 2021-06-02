@@ -1,8 +1,6 @@
 package com.ddf.framework.customize.spring.jdbc.factory;
 
 import com.ddf.framework.customize.spring.jdbc.transactional.PlatformTransactionManage;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 
 /**
@@ -20,35 +18,32 @@ public class TransactionProxyFactory {
         this.platformTransactionManage = platformTransactionManage;
     }
 
-    public Object getTransactionProxy(Class<?> object) {
-        if (object.getInterfaces().length > 0) {
-
+    public Object getTransactionProxy(Object object) {
+        if (object.getClass().getInterfaces().length > 0) {
+            return getJdkTransactionProxy(object);
         }
-        return null;
+        return object;
     }
-
 
     /**
      * 获取JDK的动态代理
      *
-     * @param clazz
+     * @param object
      * @return
      */
-    public Object getJdkTransactionProxy(Class<?> clazz) {
-        return Proxy.newProxyInstance(this.getClass()
-                .getClassLoader(), clazz.getInterfaces(), new InvocationHandler() {
-            @Override
-            public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-                platformTransactionManage.beginTransaction();
-                try {
-                    final Object returnObj = method.invoke(proxy, args);
-                    platformTransactionManage.commitTransaction();
-                    return returnObj;
-                } catch (Exception e) {
-                    platformTransactionManage.rollbackTransaction();
-                    throw e;
-                }
-            }
-        });
+    public Object getJdkTransactionProxy(Object object) {
+        System.out.println(object);
+        return Proxy.newProxyInstance(TransactionProxyFactory.class
+                .getClassLoader(), object.getClass().getInterfaces(), (proxy, method, args) -> {
+                    platformTransactionManage.beginTransaction();
+                    try {
+                        final Object returnObj = method.invoke(proxy, args);
+                        platformTransactionManage.commitTransaction();
+                        return returnObj;
+                    } catch (Exception e) {
+                        platformTransactionManage.rollbackTransaction();
+                        throw e;
+                    }
+                });
     }
 }

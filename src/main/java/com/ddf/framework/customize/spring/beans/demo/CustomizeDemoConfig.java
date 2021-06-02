@@ -36,10 +36,10 @@ public class CustomizeDemoConfig {
     @Bean
     public DruidDataSource dataSource(JdbcProperties jdbcProperties) {
         final DruidDataSource druidDataSource = new DruidDataSource();
-        druidDataSource.setUrl("jdbc:mysql://localhost:3306/zdy_mybatis?useUnicode=true&characterEncoding=UTF8&useSSL=false&serverTimezone=GMT%2B8&zeroDateTimeBehavior=convertToNull&allowMultiQueries=true&autoReconnect=true&failOverReadOnly=false&maxReconnects=10&tinyInt1isBit=false");
-        druidDataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
-        druidDataSource.setUsername("root");
-        druidDataSource.setPassword("123456");
+        druidDataSource.setUrl(jdbcProperties.getJdbcUrl());
+        druidDataSource.setDriverClassName(jdbcProperties.getDriverClassName());
+        druidDataSource.setUsername(jdbcProperties.getUsername());
+        druidDataSource.setPassword(jdbcProperties.getPassword());
         return druidDataSource;
     }
 

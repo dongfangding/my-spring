@@ -1,5 +1,6 @@
 package com.ddf.framework.customize.spring.jdbc.transactional;
 
+import com.alibaba.druid.pool.DruidDataSource;
 import com.ddf.framework.customize.spring.jdbc.factory.DataSourceFactory;
 import com.ddf.framework.customize.spring.jdbc.properties.ConnectionProperties;
 import java.sql.Connection;
@@ -18,7 +19,7 @@ public class DataSourceHolder implements DataSourceFactory {
 
     private final DataSource dataSource;
 
-    private final ThreadLocal<DataSource> currentThreadDataSource = new ThreadLocal<>();
+    private final ThreadLocal<Connection> currentThreadDataSource = new ThreadLocal<>();
 
     protected DataSourceHolder(DataSource dataSource) {
         this.dataSource = dataSource;
@@ -31,12 +32,12 @@ public class DataSourceHolder implements DataSourceFactory {
      */
     @SneakyThrows
     public Connection getThreadLocalConnection() {
-        final DataSource source = currentThreadDataSource.get();
-        Connection connection;
-        if (Objects.isNull(source)) {
+        Connection connection = currentThreadDataSource.get();;
+        if (Objects.isNull(connection)) {
+            final DruidDataSource source = (DruidDataSource) dataSource;
+            System.out.println(source.getUrl());
             connection = dataSource.getConnection();
-        } else{
-            connection =  source.getConnection();
+            currentThreadDataSource.set(connection);
         }
         return connection;
     }
