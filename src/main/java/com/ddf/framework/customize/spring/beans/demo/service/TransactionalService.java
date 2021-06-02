@@ -15,7 +15,7 @@ public interface TransactionalService {
      * @param name
      * @param value
      */
-    void insert(String name, String value);
+    void insert(String name, Integer value);
 
     /**
      * 更新name

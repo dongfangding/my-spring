@@ -1,6 +1,5 @@
 package com.ddf.framework.customize.spring.jdbc.transactional;
 
-import com.alibaba.druid.pool.DruidDataSource;
 import com.ddf.framework.customize.spring.jdbc.factory.DataSourceFactory;
 import com.ddf.framework.customize.spring.jdbc.properties.ConnectionProperties;
 import java.sql.Connection;
@@ -34,8 +33,6 @@ public class DataSourceHolder implements DataSourceFactory {
     public Connection getThreadLocalConnection() {
         Connection connection = currentThreadDataSource.get();;
         if (Objects.isNull(connection)) {
-            final DruidDataSource source = (DruidDataSource) dataSource;
-            System.out.println(source.getUrl());
             connection = dataSource.getConnection();
             currentThreadDataSource.set(connection);
         }

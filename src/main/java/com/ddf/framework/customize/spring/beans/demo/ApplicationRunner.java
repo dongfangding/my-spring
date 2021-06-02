@@ -8,6 +8,8 @@ import com.ddf.framework.customize.spring.beans.demo.service.TaskService;
 import com.ddf.framework.customize.spring.beans.demo.service.TransactionalService;
 import com.ddf.framework.customize.spring.jdbc.factory.TransactionProxyFactory;
 import com.ddf.framework.customize.spring.jdbc.transactional.PlatformTransactionManage;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * <p>description</p >
@@ -45,13 +47,27 @@ public class ApplicationRunner {
         // TODO 事务的代理框架层面是如何处理的？什么时候生成代理？是为每个有事务的方法单独存储代理还是公用一个代理？
         final TransactionProxyFactory factory = new TransactionProxyFactory(platformTransactionManage);
 
+
+        // 这里先手动获取代理执行事务
         final TransactionalService transactionalService = context.getBean(TransactionalService.class);
         final TransactionalService proxyTransactionalService = (TransactionalService) factory.getTransactionProxy(transactionalService);
-        System.out.println(transactionalService);
-        proxyTransactionalService.insert("ddf1", "value1");
-        new Thread(() -> {
-            proxyTransactionalService.insert("ss", "bb");
-        }).start();
+        System.out.println("proxyTransactionalService = " + proxyTransactionalService);
+        final ExecutorService service = Executors.newFixedThreadPool(2);
+        // value 的值为奇数测试正常事务提交
+        service.execute(() -> {
+            System.out.println(Thread.currentThread().getName() + "-------------------");
+            proxyTransactionalService.insert("sssss", 11111);
+            proxyTransactionalService.insert("sssss1111", 333333);
+            System.out.println(Thread.currentThread().getName() + "-------------------");
+        });
+        // value的值为偶数测试事务回滚
+        service.execute(() -> {
+            System.out.println(Thread.currentThread().getName() + "-------------------");
+            proxyTransactionalService.insert("sssss55555", 55555);
+            proxyTransactionalService.insert("sssss3333", 44444);
+            System.out.println(Thread.currentThread().getName() + "-------------------");
+        });
+
         Thread.sleep(10000);
     }
 }

@@ -30,15 +30,19 @@ public class TransactionalServiceImpl implements TransactionalService {
      */
     @SneakyThrows
     @Override
-    public void insert(String name, String value) {
+    public void insert(String name, Integer value) {
         final Connection connection = platformTransactionManage.getConnection();
+        System.out.println(Thread.currentThread().getName() + ": " + connection);
         System.out.println("connection = " + connection);
         String sql = "insert into `spring_transactional`(name, value) values (?, ?)";
         final PreparedStatement statement = connection.prepareStatement(sql);
         statement.setString(1, name);
-        statement.setString(2, value);
+        statement.setString(2, value.toString());
         statement.execute();
         statement.close();
+        if (value % 2 == 0) {
+            throw new RuntimeException("手动异常，测试回滚消息>>>>");
+        }
     }
 
     /**
