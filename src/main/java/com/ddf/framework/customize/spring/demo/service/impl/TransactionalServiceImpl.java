@@ -45,7 +45,7 @@ public class TransactionalServiceImpl implements TransactionalService {
         fromStatement.execute();
 
         if (amount % 2 != 0) {
-            throw new RuntimeException("手动异常，测试回滚");
+            throw new RuntimeException("手动异常，测试回滚" + amount);
         }
 
         final Connection connection2 = platformTransactionManage.getConnection();

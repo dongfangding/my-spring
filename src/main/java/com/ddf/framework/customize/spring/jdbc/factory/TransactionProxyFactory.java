@@ -39,8 +39,7 @@ public class TransactionProxyFactory {
     @SneakyThrows
     public Object getJdkTransactionProxy(Object object) {
         return Proxy.newProxyInstance(object.getClass().getClassLoader(), object.getClass().getInterfaces(), (proxy, method, args) -> {
-            // FIXME 暂时采用在执行的时候判断是否是需要开启事务的
-            if (!ReflectUtil.getMethodByName(proxy.getClass(), method.getName()).isAnnotationPresent(Transactional.class)) {
+            if (!ReflectUtil.getMethodByName(object.getClass(), method.getName()).isAnnotationPresent(Transactional.class)) {
                 return method.invoke(object, args);
             }
             platformTransactionManage.beginTransaction();

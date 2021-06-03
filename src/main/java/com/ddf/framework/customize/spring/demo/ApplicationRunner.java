@@ -53,12 +53,10 @@ public class ApplicationRunner {
         final ExecutorService service = Executors.newFixedThreadPool(2);
         // value 的集合大小为偶数测试正常事务提交
         service.execute(() -> {
-            transactionalService.transfer("ddf", "chen", 10L);
-            transactionalService.transfer("ddf", "chen", 20L);
+            transactionalService.transfer("ddf", "chen", 100L);
         });
         // value 的集合大小为奇数测试正常事务回滚
         service.execute(() -> {
-            transactionalService.transfer("ddf", "chen", 100L);
             transactionalService.transfer("ddf", "chen", 101L);
         });
         service.shutdown();
