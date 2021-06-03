@@ -1,11 +1,13 @@
 package com.ddf.framework.customize.spring.beans.demo;
 
+import cn.hutool.core.collection.ListUtil;
 import com.alibaba.druid.pool.DruidDataSource;
 import com.ddf.framework.customize.spring.beans.context.AnnotationConfigApplicationContext;
 import com.ddf.framework.customize.spring.beans.demo.model.JdbcProperties;
 import com.ddf.framework.customize.spring.beans.demo.model.TestA;
 import com.ddf.framework.customize.spring.beans.demo.service.TaskService;
 import com.ddf.framework.customize.spring.beans.demo.service.TransactionalService;
+import com.ddf.framework.customize.spring.beans.demo.service.impl.CglibTransactionalComponent;
 import com.ddf.framework.customize.spring.jdbc.factory.TransactionProxyFactory;
 import com.ddf.framework.customize.spring.jdbc.transactional.PlatformTransactionManage;
 import java.util.concurrent.ExecutorService;
@@ -51,23 +53,27 @@ public class ApplicationRunner {
         // 这里先手动获取代理执行事务
         final TransactionalService transactionalService = context.getBean(TransactionalService.class);
         final TransactionalService proxyTransactionalService = (TransactionalService) factory.getTransactionProxy(transactionalService);
-        System.out.println("proxyTransactionalService = " + proxyTransactionalService);
         final ExecutorService service = Executors.newFixedThreadPool(2);
-        // value 的值为奇数测试正常事务提交
+        // value 的集合大小为偶数测试正常事务提交
         service.execute(() -> {
-            System.out.println(Thread.currentThread().getName() + "-------------------");
-            proxyTransactionalService.insert("sssss", 11111);
-            proxyTransactionalService.insert("sssss1111", 333333);
-            System.out.println(Thread.currentThread().getName() + "-------------------");
+            proxyTransactionalService.insert(ListUtil.toList(1, 2));
         });
-        // value的值为偶数测试事务回滚
+        // value 的集合大小为奇数测试正常事务回滚
         service.execute(() -> {
-            System.out.println(Thread.currentThread().getName() + "-------------------");
-            proxyTransactionalService.insert("sssss55555", 55555);
-            proxyTransactionalService.insert("sssss3333", 44444);
-            System.out.println(Thread.currentThread().getName() + "-------------------");
+            proxyTransactionalService.insert(ListUtil.toList(3, 4, 5));
         });
 
-        Thread.sleep(10000);
+        // 使用CGLIB生成事务代理的
+        final CglibTransactionalComponent cglibTransactionalComponent = context.getBean(CglibTransactionalComponent.class);
+        final CglibTransactionalComponent cglibTransactionalComponentProxy = (CglibTransactionalComponent) factory.getTransactionProxy(cglibTransactionalComponent);
+        // value 的集合大小为偶数测试正常事务提交
+        service.execute(() -> {
+            cglibTransactionalComponentProxy.insert(ListUtil.toList(6, 7, 8, 9));
+        });
+        // value 的集合大小为奇数测试正常事务回滚
+        service.execute(() -> {
+            cglibTransactionalComponentProxy.insert(ListUtil.toList(10));
+        });
+        service.shutdown();
     }
 }

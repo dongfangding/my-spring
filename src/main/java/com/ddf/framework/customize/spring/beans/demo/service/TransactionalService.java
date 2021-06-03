@@ -1,5 +1,7 @@
 package com.ddf.framework.customize.spring.beans.demo.service;
 
+import java.util.List;
+
 /**
  * <p>description</p >
  *
@@ -12,10 +14,9 @@ public interface TransactionalService {
     /**
      * 插入
      *
-     * @param name
-     * @param value
+     * @param values
      */
-    void insert(String name, Integer value);
+    void insert(List<Integer> values);
 
     /**
      * 更新name

@@ -3,6 +3,8 @@ package com.ddf.framework.customize.spring.jdbc.factory;
 import com.ddf.framework.customize.spring.jdbc.transactional.PlatformTransactionManage;
 import java.lang.reflect.Proxy;
 import lombok.SneakyThrows;
+import net.sf.cglib.proxy.Enhancer;
+import net.sf.cglib.proxy.MethodInterceptor;
 
 /**
  * <p>description</p >
@@ -23,7 +25,7 @@ public class TransactionProxyFactory {
         if (object.getClass().getInterfaces().length > 0) {
             return getJdkTransactionProxy(object);
         }
-        return object;
+        return getCglibTransactionProxy(object);
     }
 
     /**
@@ -34,9 +36,7 @@ public class TransactionProxyFactory {
      */
     @SneakyThrows
     public Object getJdkTransactionProxy(Object object) {
-        return Proxy.newProxyInstance(object.getClass()
-                .getClassLoader(), object.getClass()
-                .getInterfaces(), (proxy, method, args) -> {
+        return Proxy.newProxyInstance(object.getClass().getClassLoader(), object.getClass().getInterfaces(), (proxy, method, args) -> {
             platformTransactionManage.beginTransaction();
             System.out.println(Thread.currentThread().getName() + "开启事务： " + platformTransactionManage.getConnection());
             try {
@@ -49,6 +49,30 @@ public class TransactionProxyFactory {
                 platformTransactionManage.rollbackTransaction();
                 throw e;
             }
+        });
+    }
+
+    /**
+     * 使用cglib动态代理生成代理对象
+     * @param obj 委托对象
+     * @return
+     */
+    public Object getCglibTransactionProxy(Object obj) {
+        return Enhancer.create(obj.getClass(), (MethodInterceptor) (o, method, objects, methodProxy) -> {
+            Object result;
+            try {
+                // 开启事务(关闭事务的自动提交)
+                platformTransactionManage.beginTransaction();
+                result = method.invoke(obj, objects);
+                // 提交事务
+                platformTransactionManage.commitTransaction();
+            } catch (Exception e) {
+                e.printStackTrace();
+                // 回滚事务
+                platformTransactionManage.rollbackTransaction();
+                throw e;
+            }
+            return result;
         });
     }
 }
