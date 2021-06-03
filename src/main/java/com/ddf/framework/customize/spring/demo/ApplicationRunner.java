@@ -1,13 +1,11 @@
-package com.ddf.framework.customize.spring.beans.demo;
+package com.ddf.framework.customize.spring.demo;
 
-import cn.hutool.core.collection.ListUtil;
 import com.alibaba.druid.pool.DruidDataSource;
 import com.ddf.framework.customize.spring.beans.context.AnnotationConfigApplicationContext;
-import com.ddf.framework.customize.spring.beans.demo.model.JdbcProperties;
-import com.ddf.framework.customize.spring.beans.demo.model.TestA;
-import com.ddf.framework.customize.spring.beans.demo.service.TaskService;
-import com.ddf.framework.customize.spring.beans.demo.service.TransactionalService;
-import com.ddf.framework.customize.spring.beans.demo.service.impl.CglibTransactionalComponent;
+import com.ddf.framework.customize.spring.demo.model.JdbcProperties;
+import com.ddf.framework.customize.spring.demo.model.TestA;
+import com.ddf.framework.customize.spring.demo.service.TaskService;
+import com.ddf.framework.customize.spring.demo.service.TransactionalService;
 import com.ddf.framework.customize.spring.jdbc.factory.TransactionProxyFactory;
 import com.ddf.framework.customize.spring.jdbc.transactional.PlatformTransactionManage;
 import java.util.concurrent.ExecutorService;
@@ -52,27 +50,16 @@ public class ApplicationRunner {
 
         // 这里先手动获取代理执行事务
         final TransactionalService transactionalService = context.getBean(TransactionalService.class);
-        final TransactionalService proxyTransactionalService = (TransactionalService) factory.getTransactionProxy(transactionalService);
         final ExecutorService service = Executors.newFixedThreadPool(2);
         // value 的集合大小为偶数测试正常事务提交
         service.execute(() -> {
-            proxyTransactionalService.insert(ListUtil.toList(1, 2));
+            transactionalService.transfer("ddf", "chen", 10L);
+            transactionalService.transfer("ddf", "chen", 20L);
         });
         // value 的集合大小为奇数测试正常事务回滚
         service.execute(() -> {
-            proxyTransactionalService.insert(ListUtil.toList(3, 4, 5));
-        });
-
-        // 使用CGLIB生成事务代理的
-        final CglibTransactionalComponent cglibTransactionalComponent = context.getBean(CglibTransactionalComponent.class);
-        final CglibTransactionalComponent cglibTransactionalComponentProxy = (CglibTransactionalComponent) factory.getTransactionProxy(cglibTransactionalComponent);
-        // value 的集合大小为偶数测试正常事务提交
-        service.execute(() -> {
-            cglibTransactionalComponentProxy.insert(ListUtil.toList(6, 7, 8, 9));
-        });
-        // value 的集合大小为奇数测试正常事务回滚
-        service.execute(() -> {
-            cglibTransactionalComponentProxy.insert(ListUtil.toList(10));
+            transactionalService.transfer("ddf", "chen", 100L);
+            transactionalService.transfer("ddf", "chen", 101L);
         });
         service.shutdown();
     }

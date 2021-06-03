@@ -1,4 +1,4 @@
-package com.ddf.framework.customize.spring.beans.demo.service;
+package com.ddf.framework.customize.spring.demo.service;
 
 /**
  * <p>description</p >

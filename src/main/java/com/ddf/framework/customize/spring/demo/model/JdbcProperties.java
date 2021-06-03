@@ -1,4 +1,4 @@
-package com.ddf.framework.customize.spring.beans.demo.model;
+package com.ddf.framework.customize.spring.demo.model;
 
 import com.ddf.framework.customize.spring.beans.annotation.Component;
 import com.ddf.framework.customize.spring.beans.annotation.Value;

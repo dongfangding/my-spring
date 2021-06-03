@@ -1,4 +1,4 @@
-package com.ddf.framework.customize.spring.beans.demo.service.impl;
+package com.ddf.framework.customize.spring.demo.service.impl;
 
 import cn.hutool.core.util.RandomUtil;
 import com.ddf.framework.customize.spring.beans.annotation.Autowired;
@@ -22,6 +22,35 @@ public class CglibTransactionalComponent {
 
     @Autowired
     private PlatformTransactionManage platformTransactionManage;
+
+    public static final String TRANSFER_FROM_SQL = "update spring_transaction_user_balance set balance = balance - ? where name = ?";
+    public static final String TRANSFER_TO_SQL = "update spring_transaction_user_balance set balance = balance + ? where name = ?";
+
+
+    /**
+     * 转账
+     *
+     * @param from
+     * @param to
+     * @param amount
+     */
+    @SneakyThrows
+    @Transactional
+    public void transfer(String from, String to, Long amount) {
+        final Connection connection = platformTransactionManage.getConnection();
+        // 转账方
+        final PreparedStatement fromStatement = connection.prepareStatement(TRANSFER_FROM_SQL);
+        fromStatement.setLong(1, amount);
+        fromStatement.setString(2, from);
+        fromStatement.execute();
+
+        final Connection connection2 = platformTransactionManage.getConnection();
+        // 转账方
+        final PreparedStatement toStatement = connection.prepareStatement(TRANSFER_FROM_SQL);
+        toStatement.setLong(1, amount);
+        toStatement.setString(2, from);
+        toStatement.execute();
+    }
 
     /**
      * 插入

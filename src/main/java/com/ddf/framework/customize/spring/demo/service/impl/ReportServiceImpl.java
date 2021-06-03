@@ -1,7 +1,7 @@
-package com.ddf.framework.customize.spring.beans.demo.service.impl;
+package com.ddf.framework.customize.spring.demo.service.impl;
 
 import com.ddf.framework.customize.spring.beans.annotation.Service;
-import com.ddf.framework.customize.spring.beans.demo.service.ReportService;
+import com.ddf.framework.customize.spring.demo.service.ReportService;
 
 /**
  * <p>description</p >

@@ -1,12 +1,12 @@
-package com.ddf.framework.customize.spring.beans.demo;
+package com.ddf.framework.customize.spring.demo;
 
 import com.alibaba.druid.pool.DruidDataSource;
 import com.ddf.framework.customize.spring.beans.annotation.Bean;
 import com.ddf.framework.customize.spring.beans.annotation.ComponentScan;
 import com.ddf.framework.customize.spring.beans.annotation.Configuration;
-import com.ddf.framework.customize.spring.beans.demo.model.JdbcProperties;
-import com.ddf.framework.customize.spring.beans.demo.model.TestA;
-import com.ddf.framework.customize.spring.beans.demo.model.TestB;
+import com.ddf.framework.customize.spring.demo.model.JdbcProperties;
+import com.ddf.framework.customize.spring.demo.model.TestA;
+import com.ddf.framework.customize.spring.demo.model.TestB;
 import com.ddf.framework.customize.spring.jdbc.transactional.DataSourceTransactionManage;
 import com.ddf.framework.customize.spring.jdbc.transactional.PlatformTransactionManage;
 
@@ -18,7 +18,7 @@ import com.ddf.framework.customize.spring.jdbc.transactional.PlatformTransaction
  * @date 2021/06/01 17:22
  */
 @Configuration
-@ComponentScan(basePackages = {"com.ddf.framework.customize.spring.beans.demo"})
+@ComponentScan(basePackages = {"com.ddf.framework.customize.spring.demo"})
 public class CustomizeDemoConfig {
 
     @Bean

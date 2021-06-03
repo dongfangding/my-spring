@@ -1,5 +1,7 @@
 package com.ddf.framework.customize.spring.jdbc.factory;
 
+import cn.hutool.core.util.ReflectUtil;
+import com.ddf.framework.customize.spring.beans.annotation.Transactional;
 import com.ddf.framework.customize.spring.jdbc.transactional.PlatformTransactionManage;
 import java.lang.reflect.Proxy;
 import lombok.SneakyThrows;
@@ -37,6 +39,10 @@ public class TransactionProxyFactory {
     @SneakyThrows
     public Object getJdkTransactionProxy(Object object) {
         return Proxy.newProxyInstance(object.getClass().getClassLoader(), object.getClass().getInterfaces(), (proxy, method, args) -> {
+            // FIXME 暂时采用在执行的时候判断是否是需要开启事务的
+            if (!ReflectUtil.getMethodByName(proxy.getClass(), method.getName()).isAnnotationPresent(Transactional.class)) {
+                return method.invoke(object, args);
+            }
             platformTransactionManage.beginTransaction();
             System.out.println(Thread.currentThread().getName() + "开启事务： " + platformTransactionManage.getConnection());
             try {

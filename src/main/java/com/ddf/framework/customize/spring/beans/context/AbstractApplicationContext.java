@@ -12,16 +12,18 @@ import com.ddf.framework.customize.spring.beans.annotation.Value;
 import com.ddf.framework.customize.spring.beans.exception.BeansException;
 import com.ddf.framework.customize.spring.beans.exception.NoSuchBeanDefinitionException;
 import com.ddf.framework.customize.spring.beans.exception.NoUniqueBeanDefinitionException;
+import com.ddf.framework.customize.spring.beans.type.ConstructorMetadata;
 import com.ddf.framework.customize.spring.beans.type.MethodMetadata;
+import com.ddf.framework.customize.spring.beans.type.StandardConstructorMetadata;
 import com.ddf.framework.customize.spring.beans.type.StandardMethodMetadata;
 import com.ddf.framework.customize.spring.jdbc.factory.TransactionProxyFactory;
 import com.ddf.framework.customize.spring.jdbc.transactional.PlatformTransactionManage;
 import com.ddf.framework.customize.spring.support.util.ContextUtil;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -66,13 +68,13 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
      */
     private final Map<Class<?>, List<String>> singletonBeanNamesByType = new ConcurrentHashMap(64);
 
-    private TransactionProxyFactory transactionProxyFactory;
-
     /**
      * 刷新容器
      */
     protected void refresh() {
         log.info("开始刷新容器>>>>>>>>>>>>>");
+        // 注册系统BeanDefinition， 比如一些依赖于业务实现的容器
+        addSystemBeanDefinition();
         postSingletonBeans();
         log.info("容器刷新完成>>>>>>>>>>>>>");
     }
@@ -95,6 +97,31 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
         }
         definitions.add(beanDefinition);
         this.beanDefinitionClassMap.put(classBeanMapKey, definitions);
+    }
+
+
+    /**
+     * 添加系统自己的bean定义对象， 一般是有参构造函数的对象， 参数需要业务方自己注入的
+     */
+    @SneakyThrows
+    public void addSystemBeanDefinition() {
+        this.addBeanDefinition(createConstructorBeanDefinition(ContextUtil.getBeanNameByClass(TransactionProxyFactory.class), TransactionProxyFactory.class, PlatformTransactionManage.class));
+    }
+
+
+    /**
+     * 创建基于构造器的BeanDefinition对象
+     *
+     * @param beanName
+     * @param clazz
+     * @param parameterTypes
+     * @return
+     */
+    @SneakyThrows
+    public SimpleConstructorBeanDefinition createConstructorBeanDefinition(String beanName, Class<?> clazz, Class<?>... parameterTypes) {
+        Constructor<?> constructor = clazz.getConstructor(parameterTypes);
+        final StandardConstructorMetadata constructorMetadata = new StandardConstructorMetadata(constructor);
+        return new SimpleConstructorBeanDefinition(beanName, constructorMetadata, clazz);
     }
 
     /**
@@ -210,7 +237,7 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
         }
         if (definition instanceof GenericBeanDefinition) {
             instance = currClazz.newInstance();
-            doCreateBean(currClazz, beanName, instance);
+            doCreateBean(currClazz, beanName, proxyBeanIsNecessary(instance));
         } else if (definition instanceof AnnotationBeanDefinition) {
             // 创建用户基于注解注入自定义实例化方法的bean
             AnnotationBeanDefinition annotationBeanDefinition = (AnnotationBeanDefinition) definition;
@@ -225,7 +252,9 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
                     if (Objects.nonNull(methodBean)) {
                         return methodBean;
                     }
-                    return doCreateBean(factoryMethod.getReturnType(), ContextUtil.getBeanNameByMethod(factoryMethod), factoryMethod.getReturnType().newInstance());
+                    return doCreateBean(factoryMethod.getReturnType(), ContextUtil.getBeanNameByMethod(factoryMethod),
+                            proxyBeanIsNecessary(factoryMethod.getReturnType().newInstance())
+                    );
                 }
                 Object[] parameterObj = new Object[types.length];
                 // 解析当前方法的入参， 每个入参都从ioc容器中取出， 如果这个时候还没创建，则执行创建bean流程
@@ -241,16 +270,52 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
                     if (Objects.nonNull(paramObj)) {
                         parameterObj[i] = paramObj;
                     } else {
-//                        final Object obj = addSingleBean(
-//                                getBeanDefinitionByClassOrName(type, parameters[i].getName(), true));
-//                        parameterObj[i] = doCreateBean(type, ContextUtil.getBeanNameByClass(type), obj);
                         parameterObj[i] = addSingleBean(
                                 getBeanDefinitionByClassOrName(type, parameters[i].getName(), true));
                     }
                 }
                 instance = factoryMethod.invoke(factoryMethod.getDeclaringClass()
                         .newInstance(), parameterObj);
-                doCreateBean(factoryMethod.getReturnType(), ContextUtil.getBeanMethodName(factoryMethod), instance);
+                doCreateBean(factoryMethod.getReturnType(), ContextUtil.getBeanMethodName(factoryMethod), proxyBeanIsNecessary(instance));
+            }
+        } else if (definition instanceof ConstructorBeanDefinition) {
+            // 创建构造函数的bean定语
+            ConstructorBeanDefinition constructorBeanDefinition = (ConstructorBeanDefinition) definition;
+            final ConstructorMetadata metadata = constructorBeanDefinition.getConstructorMetadata();
+            if (metadata instanceof ConstructorMetadata) {
+                StandardConstructorMetadata standardConstructorMetadata = (StandardConstructorMetadata) metadata;
+                final Constructor factoryConstructor = standardConstructorMetadata.getConstructor();
+                final Class<?>[] types = factoryConstructor.getParameterTypes();
+                final Parameter[] parameters = factoryConstructor.getParameters();
+                if (types.length == 0) {
+                    final Object methodBean = singletonBeanNamesByType.get(constructorBeanDefinition.getBeanClass());
+                    if (Objects.nonNull(methodBean)) {
+                        return methodBean;
+                    }
+                    return doCreateBean(constructorBeanDefinition.getBeanClass(), constructorBeanDefinition.getBeanName(),
+                            proxyBeanIsNecessary(factoryConstructor.newInstance())
+                    );
+                }
+                Object[] parameterObj = new Object[types.length];
+                // 解析当前方法的入参， 每个入参都从ioc容器中取出， 如果这个时候还没创建，则执行创建bean流程
+                // fixme 如果依赖的容器是一个@Bean修饰的，那么执行创建的时候就得要找到那个方法去执行才可以，否则调用无参构造会有问题
+                for (int i = 0; i < types.length; i++) {
+                    Class<?> type = types[i];
+                    Object paramObj;
+                    try {
+                        paramObj = getBean(type);
+                    } catch (BeansException beansException) {
+                        paramObj = null;
+                    }
+                    if (Objects.nonNull(paramObj)) {
+                        parameterObj[i] = paramObj;
+                    } else {
+                        parameterObj[i] = addSingleBean(
+                                getBeanDefinitionByClassOrName(type, parameters[i].getName(), true));
+                    }
+                }
+                instance = factoryConstructor.newInstance(parameterObj);
+                doCreateBean(constructorBeanDefinition.getBeanClass(), constructorBeanDefinition.getBeanName(), proxyBeanIsNecessary(instance));
             }
         } else {
             throw new RuntimeException("不支持的bean定义");
@@ -261,6 +326,16 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
             populateBeanProperties(beanName, instance);
         }
         return instance;
+    }
+
+    private Object proxyBeanIsNecessary(Object bean) {
+        if (ContextUtil.hasTransactionAnnotationOnClassMethod(bean.getClass(), Transactional.class)) {
+            bean = ((TransactionProxyFactory) doGetAndCreateBean(
+                    TransactionProxyFactory.class, ContextUtil.getBeanNameByClass(TransactionProxyFactory.class),
+                    Boolean.TRUE
+            )).getTransactionProxy(bean);
+        }
+        return bean;
     }
 
     /**
@@ -278,6 +353,29 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
             // 处理bean的{@link Value} 注解属性注入
             populateBeanFieldValue(bean, field);
         }
+    }
+
+
+    /**
+     * 执行获取bean, 如果bean不存在则获取对应的bean定义执行bean的创建流程， 如果bean定义也不存在，则按需求抛出异常
+     *
+     * @param clazz
+     * @param beanName
+     * @param required
+     * @return
+     */
+    public Object doGetAndCreateBean(Class<?> clazz, String beanName, boolean required) {
+        Object bean;
+        try {
+            bean = getBean(clazz);
+        } catch (BeansException beansException) {
+            bean = null;
+        }
+        if (Objects.nonNull(bean)) {
+            return bean;
+        }
+        final BeanDefinition beanDefinition = getBeanDefinitionByClassOrName(clazz, beanName, required);
+        return addSingleBean(beanDefinition);
     }
 
     /**
@@ -395,18 +493,6 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
         ReflectUtil.setFieldValue(instance, field.getName(), fieldValue);
     }
 
-    private void proxyTransaction(Class<?> currClazz) {
-        if (Objects.nonNull(transactionProxyFactory)) {
-            transactionProxyFactory = new TransactionProxyFactory(getBean(PlatformTransactionManage.class));
-        }
-        final Method[] methods = currClazz.getMethods();
-        final boolean hasTransaction = Arrays.stream(methods)
-                .anyMatch(val -> val.isAnnotationPresent(Transactional.class));
-        if (hasTransaction) {
-
-        }
-    }
-
     /**
      * 判断一个类是否有IOC标记的注解,统一收口
      *
@@ -419,6 +505,14 @@ public abstract class AbstractApplicationContext implements ApplicationContext {
     }
 
 
+    /**
+     * 获取bean定义
+     *
+     * @param clazz
+     * @param beanName
+     * @param isRequired
+     * @return
+     */
     public BeanDefinition getBeanDefinitionByClassOrName(Class<?> clazz, String beanName, boolean isRequired) {
         final List<BeanDefinition> definitions = this.beanDefinitionClassMap.get(clazz);
         if (CollectionUtil.isEmpty(definitions)) {
