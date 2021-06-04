@@ -17,7 +17,7 @@ import lombok.SneakyThrows;
  * @version 1.0
  * @date 2021/06/03 09:55
  */
-@Component
+@Component("cglibTransaction")
 public class CglibTransactionalComponent {
 
     @Autowired
@@ -44,7 +44,7 @@ public class CglibTransactionalComponent {
         fromStatement.setString(2, from);
         fromStatement.execute();
 
-        final Connection connection2 = platformTransactionManage.getConnection();
+        final Connection toConn = platformTransactionManage.getConnection();
         // 转账方
         final PreparedStatement toStatement = connection.prepareStatement(TRANSFER_FROM_SQL);
         toStatement.setLong(1, amount);

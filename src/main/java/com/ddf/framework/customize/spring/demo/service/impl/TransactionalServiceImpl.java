@@ -48,9 +48,9 @@ public class TransactionalServiceImpl implements TransactionalService {
             throw new RuntimeException("手动异常，测试回滚" + amount);
         }
 
-        final Connection connection2 = platformTransactionManage.getConnection();
+        final Connection toConnection = platformTransactionManage.getConnection();
         // 转账方
-        final PreparedStatement toStatement = connection.prepareStatement(TRANSFER_TO_SQL);
+        final PreparedStatement toStatement = toConnection.prepareStatement(TRANSFER_TO_SQL);
         toStatement.setLong(1, amount);
         toStatement.setString(2, to);
         toStatement.execute();

@@ -6,7 +6,7 @@ import com.ddf.framework.customize.spring.demo.model.JdbcProperties;
 import com.ddf.framework.customize.spring.demo.model.TestA;
 import com.ddf.framework.customize.spring.demo.service.TaskService;
 import com.ddf.framework.customize.spring.demo.service.TransactionalService;
-import com.ddf.framework.customize.spring.jdbc.factory.TransactionProxyFactory;
+import com.ddf.framework.customize.spring.demo.service.impl.CglibTransactionalComponent;
 import com.ddf.framework.customize.spring.jdbc.transactional.PlatformTransactionManage;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -43,11 +43,6 @@ public class ApplicationRunner {
         System.out.println(Thread.currentThread().getName() + "获取连接2: " + platformTransactionManage.getConnection());
         System.out.println(Thread.currentThread().getName() + "获取连接3: " + platformTransactionManage.getConnection());
 
-
-        // TODO 事务的代理框架层面是如何处理的？什么时候生成代理？是为每个有事务的方法单独存储代理还是公用一个代理？
-        final TransactionProxyFactory factory = new TransactionProxyFactory(platformTransactionManage);
-
-
         // 这里先手动获取代理执行事务
         final TransactionalService transactionalService = context.getBean(TransactionalService.class);
         final ExecutorService service = Executors.newFixedThreadPool(2);
@@ -58,6 +53,17 @@ public class ApplicationRunner {
         // value 的集合大小为奇数测试正常事务回滚
         service.execute(() -> {
             transactionalService.transfer("ddf", "chen", 101L);
+        });
+
+
+        final CglibTransactionalComponent transaction = (CglibTransactionalComponent) context.getBean("cglibTransaction");
+        // value 的集合大小为偶数测试正常事务提交
+        service.execute(() -> {
+            transactionalService.transfer("ddf", "chen", 50L);
+        });
+        // value 的集合大小为奇数测试正常事务回滚
+        service.execute(() -> {
+            transactionalService.transfer("ddf", "chen", 51L);
         });
         service.shutdown();
     }
