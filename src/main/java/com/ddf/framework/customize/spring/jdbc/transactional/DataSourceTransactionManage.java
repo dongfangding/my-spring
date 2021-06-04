@@ -3,6 +3,7 @@ package com.ddf.framework.customize.spring.jdbc.transactional;
 import com.ddf.framework.customize.spring.jdbc.factory.SimpleDataSource;
 import java.sql.Connection;
 import javax.sql.DataSource;
+import lombok.Data;
 import lombok.SneakyThrows;
 
 /**
@@ -12,6 +13,7 @@ import lombok.SneakyThrows;
  * @version 1.0
  * @date 2021/05/27 18:12
  */
+@Data
 public class DataSourceTransactionManage implements PlatformTransactionManage {
 
     private final DataSourceHolder dataSourceHolder;

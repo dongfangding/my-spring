@@ -2,6 +2,7 @@ package com.ddf.framework.customize.spring.jdbc.factory;
 
 import cn.hutool.core.util.ReflectUtil;
 import com.ddf.framework.customize.spring.beans.annotation.Transactional;
+import com.ddf.framework.customize.spring.jdbc.transactional.DataSourceTransactionManage;
 import com.ddf.framework.customize.spring.jdbc.transactional.PlatformTransactionManage;
 import java.lang.reflect.Proxy;
 import lombok.SneakyThrows;
@@ -53,6 +54,11 @@ public class TransactionProxyFactory {
                 System.out.println(Thread.currentThread().getName() + "回滚事务： " + platformTransactionManage.getConnection());
                 platformTransactionManage.rollbackTransaction();
                 throw e;
+            } finally {
+                // 没把方法定义在接口，因为可能是不同的事务管理器实现方式并不相同
+                if (platformTransactionManage instanceof DataSourceTransactionManage) {
+                    ((DataSourceTransactionManage) platformTransactionManage).getDataSourceHolder().removeThreadLocalConnection();
+                }
             }
         });
     }
