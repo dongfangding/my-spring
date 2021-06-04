@@ -59,11 +59,11 @@ public class ApplicationRunner {
         final CglibTransactionalComponent transaction = (CglibTransactionalComponent) context.getBean("cglibTransaction");
         // value 的集合大小为偶数测试正常事务提交
         service.execute(() -> {
-            transactionalService.transfer("ddf", "chen", 50L);
+            transaction.transfer("ddf", "chen", 50L);
         });
         // value 的集合大小为奇数测试正常事务回滚
         service.execute(() -> {
-            transactionalService.transfer("ddf", "chen", 51L);
+            transaction.transfer("ddf", "chen", 51L);
         });
         service.shutdown();
     }

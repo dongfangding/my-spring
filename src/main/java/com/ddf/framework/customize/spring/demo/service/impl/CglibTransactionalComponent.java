@@ -44,11 +44,15 @@ public class CglibTransactionalComponent {
         fromStatement.setString(2, from);
         fromStatement.execute();
 
+        if (amount % 2 != 0) {
+            throw new RuntimeException("手动异常，测试回滚" + amount);
+        }
+
         final Connection toConn = platformTransactionManage.getConnection();
         // 转账方
-        final PreparedStatement toStatement = connection.prepareStatement(TRANSFER_FROM_SQL);
+        final PreparedStatement toStatement = toConn.prepareStatement(TRANSFER_TO_SQL);
         toStatement.setLong(1, amount);
-        toStatement.setString(2, from);
+        toStatement.setString(2, to);
         toStatement.execute();
     }
 
