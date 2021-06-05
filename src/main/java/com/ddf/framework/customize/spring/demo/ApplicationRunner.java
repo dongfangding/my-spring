@@ -20,13 +20,15 @@ import java.util.concurrent.Executors;
  */
 public class ApplicationRunner {
 
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) {
+        // 指定配置类启动容器
         final AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(CustomizeDemoConfig.class);
 
         // 测试IOC
         final TaskService taskService = context.getBean(TaskService.class);
         taskService.doTask("ddf", "我要开始装逼了");
 
+        // 测试@Value静态注入对象属性
         final JdbcProperties jdbcProperties = context.getBean(JdbcProperties.class);
         System.out.println("获取到的bean的结果: " + jdbcProperties);
 
@@ -43,11 +45,10 @@ public class ApplicationRunner {
         System.out.println(Thread.currentThread().getName() + "获取连接2: " + platformTransactionManage.getConnection());
         System.out.println(Thread.currentThread().getName() + "获取连接3: " + platformTransactionManage.getConnection());
 
-        // 这里先手动获取代理执行事务
-        final TransactionalService transactionalService = context.getBean(TransactionalService.class);
         final ExecutorService service = Executors.newFixedThreadPool(2);
 
-
+        // 基于接口的jdk代理的事务实现
+        final TransactionalService transactionalService = context.getBean(TransactionalService.class);
         // value 的集合大小为偶数测试正常事务提交
         service.execute(() -> {
             transactionalService.transfer("ddf", "chen", 100L);
@@ -57,7 +58,7 @@ public class ApplicationRunner {
             transactionalService.transfer("ddf", "chen", 101L);
         });
 
-
+        // 测试cglib方式的事务代理
         final CglibTransactionalComponent transaction = (CglibTransactionalComponent) context.getBean("cglibTransaction");
         // value 的集合大小为偶数测试正常事务提交
         service.execute(() -> {
