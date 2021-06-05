@@ -46,6 +46,8 @@ public class ApplicationRunner {
         // 这里先手动获取代理执行事务
         final TransactionalService transactionalService = context.getBean(TransactionalService.class);
         final ExecutorService service = Executors.newFixedThreadPool(2);
+
+
         // value 的集合大小为偶数测试正常事务提交
         service.execute(() -> {
             transactionalService.transfer("ddf", "chen", 100L);

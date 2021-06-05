@@ -10,7 +10,7 @@ import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;
 
 /**
- * <p>description</p >
+ * <p>事务代理工厂</p >
  *
  * @author Snowball
  * @version 1.0
@@ -72,6 +72,9 @@ public class TransactionProxyFactory {
         return Enhancer.create(obj.getClass(), (MethodInterceptor) (o, method, objects, methodProxy) -> {
             Object result;
             try {
+                if (!method.isAnnotationPresent(Transactional.class)) {
+                    return method.invoke(obj, objects);
+                }
                 // 开启事务(关闭事务的自动提交)
                 platformTransactionManage.beginTransaction();
                 result = method.invoke(obj, objects);
