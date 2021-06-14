@@ -18,15 +18,15 @@ public class JdbcProperties {
     @Value("1000")
     private Integer id;
 
-    @Value(value = "jdbc:mysql://106.75.227.151:3306/framework_customize?useUnicode=true&characterEncoding=UTF8&useSSL=false&serverTimezone=GMT%2B8&zeroDateTimeBehavior=convertToNull&allowMultiQueries=true&autoReconnect=true&failOverReadOnly=false&maxReconnects=10&tinyInt1isBit=false")
+    @Value(value = "jdbc:mysql://localhost:3306/framework_customize?useUnicode=true&characterEncoding=UTF8&useSSL=false&serverTimezone=GMT%2B8&zeroDateTimeBehavior=convertToNull&allowMultiQueries=true&autoReconnect=true&failOverReadOnly=false&maxReconnects=10&tinyInt1isBit=false")
     private String jdbcUrl;
 
     @Value("com.mysql.cj.jdbc.Driver")
     private String driverClassName;
 
-    @Value("develop")
+    @Value("root")
     private String username;
 
-    @Value("12345678")
+    @Value("123456")
     private String password;
 }
